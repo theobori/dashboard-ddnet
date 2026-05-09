@@ -28,22 +28,33 @@
 
 ;; Display DDNet player informations on Dashboard
 
+(require 'seq)
 (require 'request)
 (require 'dashboard)
 (require 'dashboard-widgets)
 
 (add-to-list
  'dashboard-item-generators
- '(ddnet-last-finishes . dashboard-ddnet--insert-player-last-finishes))
+ '(ddnet-player-last-finishes . dashboard-ddnet--insert-player-last-finishes))
 
-;;;; User options
+(add-to-list
+ 'dashboard-item-generators
+ '(ddnet-player-favorite-partners . dashboard-ddnet--insert-player-favorite-partners))
+
+(add-to-list
+ 'dashboard-item-generators
+ '(ddnet-player-last-activity . dashboard-ddnet--insert-player-last-activity))
 
 (defgroup dashboard-ddnet ()
   "Display DDNet player informations on Dashboard"
   :group 'tools
   :link '(url-link :tag "GitHub Repository" "https://github.com/theobori/dashboard-ddnet"))
 
-;;;; User options
+;;;; User options and variables
+
+(defvar dashboard-ddnet--cache nil "")
+(defvar dashboard-ddnet--cache-float-time 0 "")
+(defvar dashboard-ddnet--cache-ttl 15 "")
 
 (defcustom dashboard-ddnet-player-name "nameless tee"
   "DDNet player name"
@@ -71,11 +82,12 @@
    (format "%s/players/?json2=%s"
 	   dashboard-ddnet-url dashboard-ddnet-player-name)))
 
-(defun dashboard-ddnet--page-player-url-format ()
+(defun dashboard-ddnet--page-player-url-format (&optional player-name)
   ""
   (url-encode-url
    (format "%s/players/%s"
-	   dashboard-ddnet-url dashboard-ddnet-player-name)))
+	   dashboard-ddnet-url (or player-name
+				   dashboard-ddnet-player-name))))
 
 (defun dashboard-ddnet--page-map-url-format (map-name)
   ""
@@ -85,33 +97,16 @@
 
 (defun dashboard-ddnet--get-json-player-informations ()
   ""
-  (request-response-data
-   (request (dashboard-ddnet--json-player-url-format)
-     :parser 'json-read
-     :sync t)))
+  (if (<= (- (float-time) dashboard-ddnet--cache-float-time) dashboard-ddnet--cache-ttl)
+      dashboard-ddnet--cache
+    (setq dashboard-ddnet--cache (request-response-data
+				  (request (dashboard-ddnet--json-player-url-format)
+				    :parser 'json-read
+				    :sync t)))
+    (setq dashboard-ddnet--cache-float-time (float-time))
+    dashboard-ddnet--cache))
 
-(defun dashboard-ddnet--player-last-finish-format (last-finish)
-  ""
-  (let ((time (floor (assocdr 'time last-finish))))
-    (format "%s: %s %s: %s (%02d:%02d)"
-	    (dashboard-ddnet--unix-timestamp-format (assocdr 'timestamp last-finish))
-	    (assocdr 'country last-finish)
-	    (assocdr 'type last-finish)
-	    (assocdr 'map last-finish)
-	    (/ time 60)
-	    (% time 60))))
-
-(defun dashboard-ddnet--player-last-finishes-parse (last-finishes)
-  "list of cons desired format 08/05/2026 23:36: GER Moderate: Jvice (12:34)"
-  (let (ans)
-    (dotimes (i (length last-finishes))
-      (let ((last-finish (aref last-finishes i)))
-	(push (cons
-	       (dashboard-ddnet--player-last-finish-format last-finish)
-	       (dashboard-ddnet--page-map-url-format (assocdr 'map last-finish))) ans)))
-    (reverse ans)))
-
-(defun dashboard-ddnet--insert-pairs (title pairs)
+(defun dashboard-ddnet--insert-pairs-helper (title pairs)
   ""
   (when pairs
     (dashboard-insert-heading title)
@@ -128,16 +123,94 @@
                      :format "%[%t%]"
 		     (car pair)))))
 
-(defun dashboard-ddnet--insert-player-last-finishes (list-size)
+(defun dashboard-ddnet--insert-player-vector-helper (title player-information-key vector-parser-function list-size)
   ""
   (let* ((player-informations (dashboard-ddnet--get-json-player-informations))
-	 (last-finishes (assocdr 'last_finishes player-informations))
-	 (pairs (seq-take (dashboard-ddnet--player-last-finishes-parse last-finishes) list-size)))
-    (dashboard-ddnet--insert-pairs "DDNet last finishes:" pairs)))
+	 (vector (seq-take
+		  (assocdr player-information-key player-informations)
+		  list-size))
+	 (pairs (funcall vector-parser-function vector)))
+    (dashboard-ddnet--insert-pairs-helper title pairs)))
 
-(defun dashboard-ddnet--insert-player-favorite_partners ()
+(defun dashboard-ddnet--player-last-finish-format (last-finish)
   ""
-  )
+  (let ((time (floor (assocdr 'time last-finish)))
+	(timestamp (assocdr 'timestamp last-finish)))
+    (format "%s: %s %s: %s (%02d:%02d)"
+	    (dashboard-ddnet--unix-timestamp-format timestamp)
+	    (assocdr 'country last-finish)
+	    (assocdr 'type last-finish)
+	    (assocdr 'map last-finish)
+	    (/ time 60)
+	    (% time 60))))
+
+(defun dashboard-ddnet--player-last-finishes-parse (last-finishes)
+  "list of cons desired format 08/05/2026 23:36: GER Moderate: Jvice (12:34)"
+  (let (ans)
+    (dotimes (i (length last-finishes))
+      (let* ((last-finish (aref last-finishes i))
+	     (map-name (assocdr 'map last-finish)))
+	(push (cons
+	       (dashboard-ddnet--player-last-finish-format last-finish)
+	       (dashboard-ddnet--page-map-url-format map-name))
+	      ans)))
+    (reverse ans)))
+
+(defun dashboard-ddnet--insert-player-last-finishes (list-size)
+  ""
+  (when (> list-size 10)
+    (error "It cannot fetch more than 10 last finishes"))
+  (dashboard-ddnet--insert-player-vector-helper "DDNet last finishes:"
+						'last_finishes
+						#'dashboard-ddnet--player-last-finishes-parse
+						list-size))
+
+(defun dashboard-ddnet--player-favorite-partner-format (favorite-partner)
+  ""
+  (format "%s: %d ranks"
+	  (assocdr 'name favorite-partner)
+	  (assocdr 'finishes favorite-partner)))
+
+(defun dashboard-ddnet--player-favorite-partners-parse (favorite-partners)
+  ""
+  (let (ans)
+    (dotimes (i (length favorite-partners))
+      (let ((favorite-partner (aref favorite-partners i)))
+	(push (cons (format "%d. %s"
+			    (+ i 1)
+			    (dashboard-ddnet--player-favorite-partner-format favorite-partner))
+		    (dashboard-ddnet--page-player-url-format (assocdr 'name favorite-partner)))
+	      ans)))
+    (reverse ans)))
+
+(defun dashboard-ddnet--insert-player-favorite-partners (list-size)
+  ""
+  (when (> list-size 10)
+    (error "It cannot fetch more than 10 favorite partners"))
+  (dashboard-ddnet--insert-player-vector-helper "DDNet favorite partners:"
+						'favorite_partners
+						#'dashboard-ddnet--player-favorite-partners-parse
+						list-size))
+
+(defun dashboard-ddnet--player-last-activity-parse (activity)
+  ""
+  (let ((ans)
+	(activity-desc (reverse activity)))
+    (dotimes (i (length activity-desc))
+      (let ((day (aref activity i)))
+	(push (cons (format "%d hours played on %s"
+			    (assocdr 'hours_played day)
+			    (assocdr 'date day))
+		    (dashboard-ddnet--page-player-url-format))
+	      ans)))
+    (reverse ans)))
+
+(defun dashboard-ddnet--insert-player-last-activity (list-size)
+  ""
+  (dashboard-ddnet--insert-player-vector-helper "DDNet last activity:"
+						'activity
+						#'dashboard-ddnet--player-last-activity-parse
+						list-size))
 
 ;;; Code
 (provide 'dashboard-ddnet)

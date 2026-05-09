@@ -14,7 +14,6 @@ melpaBuild {
     request
   ];
 
-
   meta = {
     homepage = "https://github.com/theobori/dashboard-ddnet";
     description = "Display DDNet player informations on Dashboard";
