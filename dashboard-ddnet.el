@@ -130,17 +130,15 @@ should have the inserted value as car and an associated url as cdr."
                      :format "%[%t%]"
 		     (car el)))))
 
-(defun dashboard-ddnet--insert-player-vector-helper (title player-information-key vector-parser-function list-size)
-  "Helper function that get specific player informations that must be a
-vector with a given PLAYER-INFORMATION-KEY. Apply VECTOR-PARSER-FUNCTION
-on it to get a alist and finally insert each element of the alist by
-calling `dashboard-ddnet--insert-alist-helper'."
+(defun dashboard-ddnet--insert-player-section-helper (title key parser-fn list-size)
+  "Helper function for inserting a DDNet player dashboard section. It gets
+player information with a specific KEY, then it is parsed using the
+PARSER-FN that mush return a alist."
   (let* ((player-informations (dashboard-ddnet--get-json-player-informations))
-	 (vector (seq-take
-		  (assocdr player-information-key player-informations)
-		  list-size))
-	 (alist (funcall vector-parser-function vector)))
-    (dashboard-ddnet--insert-alist-helper title alist)))
+	 (player-information (assocdr key player-informations))
+	 (alist (funcall parser-fn player-information)))
+    (dashboard-ddnet--insert-alist-helper title
+					  (seq-take alist list-size))))
 
 (defun dashboard-ddnet--player-last-finish-format (last-finish)
   "Returns a formatted string representing a LAST-FINISH alist."
@@ -170,10 +168,10 @@ calling `dashboard-ddnet--insert-alist-helper'."
   "Insert the DDNet player LIST-SIZE last finishes."
   (when (> list-size 10)
     (error "It cannot fetch more than 10 last finishes."))
-  (dashboard-ddnet--insert-player-vector-helper "DDNet last finishes:"
-						'last_finishes
-						#'dashboard-ddnet--player-last-finishes-parse
-						list-size))
+  (dashboard-ddnet--insert-player-section-helper "DDNet last finishes:"
+						 'last_finishes
+						 #'dashboard-ddnet--player-last-finishes-parse
+						 list-size))
 
 (defun dashboard-ddnet--player-favorite-partner-format (favorite-partner)
   "Returns a formatted string representing a FAVORITE-PARTNER alist."
@@ -197,10 +195,10 @@ calling `dashboard-ddnet--insert-alist-helper'."
   "Insert the DDNet player LIST-SIZE favorite partners."
   (when (> list-size 10)
     (error "It cannot fetch more than 10 favorite partners."))
-  (dashboard-ddnet--insert-player-vector-helper "DDNet favorite partners:"
-						'favorite_partners
-						#'dashboard-ddnet--player-favorite-partners-parse
-						list-size))
+  (dashboard-ddnet--insert-player-section-helper "DDNet favorite partners:"
+						 'favorite_partners
+						 #'dashboard-ddnet--player-favorite-partners-parse
+						 list-size))
 
 (defun dashboard-ddnet--player-last-activity-parse (activity)
   "Parses the LAST-ACTIVITY vector and returns a alist."
