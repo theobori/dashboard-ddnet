@@ -133,7 +133,7 @@ should have the inserted value as car and an associated url as cdr."
 (defun dashboard-ddnet--insert-player-section-helper (title key parser-fn list-size)
   "Helper function for inserting a DDNet player dashboard section. It gets
 player information with a specific KEY, then it is parsed using the
-PARSER-FN that mush return a alist."
+PARSER-FN that must return a alist."
   (let* ((player-informations (dashboard-ddnet--get-json-player-informations))
 	 (player-information (assocdr key player-informations))
 	 (alist (funcall parser-fn player-information)))
@@ -224,7 +224,7 @@ PARSER-FN that mush return a alist."
     (dashboard-ddnet--insert-alist-helper "DDNet last activity:"
 					  last-activity-alist)))
 
-(defun dashboard-ddnet--insert-player-general-informations (&optional list-size)
+(defun dashboard-ddnet--insert-player-general-informations (&optional _)
   "Insert the DDNet player general informations. LIST-SIZE will not be used
 for this section."
   (let ((player-informations (dashboard-ddnet--get-json-player-informations))
