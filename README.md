@@ -8,7 +8,7 @@ dashboard-ddnet is a KISS Emacs package which contains functions that have been 
 
 ## Getting started
 
-To use the project you need [Emacs](https://www.gnu.org/software/emacs/) with a version higher or equal than `30.1`, [dashboard](https://github.com/emacs-dashboard/dashboard), [request](https://github.com/tkf/emacs-request), [curl](https://github.com/curl/curl) for the request package and [GNU Make](https://www.gnu.org/software/make/) if you want to build and install it manually.
+To use the project you need [Emacs](https://www.gnu.org/software/emacs/) with a version higher or equal than `30.1`, [dashboard](https://github.com/emacs-dashboard/dashboard), [request](https://github.com/tkf/emacs-request), [curl](https://github.com/curl/curl) for the request package, optionally [all-the-icons](https://github.com/domtronn/all-the-icons.el) and [GNU Make](https://www.gnu.org/software/make/) if you want to build and install it manually.
 
 ## Installation
 
@@ -34,9 +34,7 @@ If you're using [straight.el](https://github.com/radian-software/straight.el) yo
 
 ```emacs-lisp
 (use-package dashboard-ddnet
-:straight (dashboard-ddnet :type git :host github :repo "theobori/dashboard-ddnet")
-:custom
-  (dashboard-ddnet-player-name "brainless tee"))
+  :straight (dashboard-ddnet :type git :host github :repo "theobori/dashboard-ddnet"))
 ```
 
 ## Usage
@@ -50,7 +48,31 @@ For using it, you can insert cons in `dashboard-items` like below.
 			            (ddnet-player-last-activity . 5)))
 ```
 
-By default, cache TTL is set to 5 minutes, feel free to update the `dashboard-ddnet--cache-ttl` variable to the value you want.
+Here is a simple example of a complete configuration that includes the `dashboard` and `dashboard-ddnet` packages.
+
+```emacs-lisp
+(use-package dashboard-ddnet
+:custom
+  (dashboard-ddnet-player-name "brainless tee")
+  (dashboard-ddnet-cache-ttl 600))
+
+(use-package dashboard
+  :custom
+  (dashboard-center-content t)
+  (dashboard-set-navigator t)
+  (dashboard-items '((ddnet-player-general-informations . 5)
+					 (ddnet-player-last-finishes . 5)
+					 (ddnet-player-favorite-partners . 5)
+					 (ddnet-player-last-activity . 5)))
+  :config
+  (setq initial-buffer-choice (lambda ()
+							  (get-buffer-create "*dashboard*")
+							  (dashboard-refresh-buffer))))
+```
+
+## Customizations
+
+The package contains several Emacs customizations, including `dashboard-ddnet-cache-ttl`. By default, it's set to 300 seconds, feel free to update it to the value you want.
 
 ## Overview
 

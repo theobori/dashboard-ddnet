@@ -26,7 +26,7 @@
 
 ;;; Commentary
 
-;; Display DDNet player informations on Dashboard
+;; Display DDNet player informations on Dashboard.
 
 (require 'seq)
 (require 'request)
@@ -56,9 +56,11 @@
 
 ;;;; User options and variables
 
-(defvar dashboard-ddnet--cache-data nil "HTTP request reponse data cached.")
-(defvar dashboard-ddnet--cache-float-time 0 "The current time as a float of seconds since the epoch.")
-(defvar dashboard-ddnet--cache-ttl 300 "Time to live for the cached data.")
+(defvar dashboard-ddnet--cache-data nil
+  "HTTP request reponse data cached.")
+
+(defvar dashboard-ddnet--cache-float-time 0
+  "The current time as a float of seconds since the epoch.")
 
 (defcustom dashboard-ddnet-player-name "nameless tee"
   "DDNet player name"
@@ -68,6 +70,22 @@
 (defcustom dashboard-ddnet-url "https://ddnet.org"
   "DDNet base url"
   :type 'string
+  :group 'dashboard-ddnet)
+
+(defcustom dashboard-ddnet-cache-ttl 300
+  "Time to live in seconds for the cached data."
+  :type 'integer
+  :group 'dashboard-ddnet)
+
+(defcustom dashboard-ddnet-heading-icons
+  '((ddnet-player-last-finishes   . "history")
+    (ddnet-player-favorite-partners . "bookmark")
+    (ddnet-player-last-activity    . "calendar")
+    (ddnet-player-general-informations  . "rocket"))
+  "Association list for the icons of the heading sections.
+Will be of the form `(list-type . icon-name-string)`."
+
+  :type  '(repeat (alist :key-type symbol :value-type string))
   :group 'dashboard-ddnet)
 
 ;;;; Functions and Emacs user commands
@@ -99,11 +117,28 @@
    (format "%s/maps/%s"
 	   dashboard-ddnet-url map-name)))
 
+(defun dashboard-ddnet--insert-all-the-icons-icon (icon)
+  "Insert an icon if `all-the-icons' is available."
+  ;; See https://github.com/emacs-dashboard/dashboard/blob/b648a45684677aa29cdb00e4d14d02dd9fa9cb68/dashboard-widgets.el#L477
+  (when (and (dashboard-display-icons-p) dashboard-ddnet-heading-icons)
+    ;; Try loading `all-the-icons'
+    (unless (or (fboundp 'all-the-icons-octicon)
+                (require 'all-the-icons nil 'noerror))
+      (error "Package `all-the-icons' isn't installed"))
+    (insert icon)))
+
+(defun dashboard-ddnet--insert-all-the-icons-icon-by-key (key)
+  "Insert an icon specified by KEY that must be a
+`dashboard-ddnet-heading-icons' key."
+  (dashboard-ddnet--insert-all-the-icons-icon
+   (all-the-icons-octicon (assocdr key dashboard-ddnet-heading-icons)
+                          :height 1.2 :v-adjust 0.0 :face 'dashboard-heading)))
+
 (defun dashboard-ddnet--get-json-player-informations ()
   "Returns the player informations as a Emacs value mirroring JSON. If the
 cached data has no more time to live, it makes HTTP request and updates
 the cache values."
-  (if (<= (- (float-time) dashboard-ddnet--cache-float-time) dashboard-ddnet--cache-ttl)
+  (if (<= (- (float-time) dashboard-ddnet--cache-float-time) dashboard-ddnet-cache-ttl)
       dashboard-ddnet--cache-data
     (setq dashboard-ddnet--cache-data (request-response-data
 				       (request (dashboard-ddnet--json-player-url-format)
@@ -112,33 +147,37 @@ the cache values."
     (setq dashboard-ddnet--cache-float-time (float-time))
     dashboard-ddnet--cache-data))
 
-(defun dashboard-ddnet--insert-alist-helper (title alist)
+(defun dashboard-ddnet--insert-alist-helper (alist)
   "Helper function that first insert a TITLE, then ALIST where each cons
 should have the inserted value as car and an associated url as cdr."
-  (when alist
-    (dashboard-insert-heading title)
-    (dolist (el alist)
-      (insert "\n    ")
-      (widget-create 'push-button
-                     :action `(lambda (&rest _)
-				(browse-url ,(cdr el)))
-                     :mouse-face 'highlight
-                     :button-face 'dashboard-items-face
-                     :follow-link "\C-m"
-                     :button-prefix ""
-                     :button-suffix ""
-                     :format "%[%t%]"
-		     (car el)))))
+  (dolist (el alist)
+    (insert "\n    ")
+    (widget-create 'push-button
+                   :action `(lambda (&rest _)
+			      (browse-url ,(cdr el)))
+                   :mouse-face 'highlight
+                   :button-face 'dashboard-items-face
+                   :follow-link "\C-m"
+                   :button-prefix ""
+                   :button-suffix ""
+                   :format "%[%t%]"
+		   (car el))))
 
-(defun dashboard-ddnet--insert-player-section-helper (title key parser-fn list-size)
-  "Helper function for inserting a DDNet player dashboard section. It gets
-player information with a specific KEY, then it is parsed using the
-PARSER-FN that must return a alist."
+(defun dashboard-ddnet--insert-player-section-helper (title key parser-fn list-size &optional icon-key)
+  "Helper function for inserting a DDNet player dashboard section. It will
+also insert an icon if ICON-KEY is non-nil. It gets player information
+with a specific KEY, then it is parsed using the PARSER-FN that must
+return a alist."
   (let* ((player-informations (dashboard-ddnet--get-json-player-informations))
 	 (player-information (assocdr key player-informations))
 	 (alist (funcall parser-fn player-information)))
-    (dashboard-ddnet--insert-alist-helper title
-					  (seq-take alist list-size))))
+    (when alist
+      (when icon-key
+	(dashboard-ddnet--insert-all-the-icons-icon-by-key icon-key)
+	(insert " "))
+      (dashboard-insert-heading title)
+      (dashboard-ddnet--insert-alist-helper (seq-take
+					     alist list-size)))))
 
 (defun dashboard-ddnet--player-last-finish-format (last-finish)
   "Returns a formatted string representing a LAST-FINISH alist."
@@ -171,7 +210,8 @@ PARSER-FN that must return a alist."
   (dashboard-ddnet--insert-player-section-helper "DDNet last finishes:"
 						 'last_finishes
 						 #'dashboard-ddnet--player-last-finishes-parse
-						 list-size))
+						 list-size
+						 'ddnet-player-last-finishes))
 
 (defun dashboard-ddnet--player-favorite-partner-format (favorite-partner)
   "Returns a formatted string representing a FAVORITE-PARTNER alist."
@@ -198,7 +238,8 @@ PARSER-FN that must return a alist."
   (dashboard-ddnet--insert-player-section-helper "DDNet favorite partners:"
 						 'favorite_partners
 						 #'dashboard-ddnet--player-favorite-partners-parse
-						 list-size))
+						 list-size
+						 'ddnet-player-favorite-partners))
 
 (defun dashboard-ddnet--player-last-activity-parse (activity)
   "Parses the LAST-ACTIVITY vector and returns a alist."
@@ -221,8 +262,10 @@ PARSER-FN that must return a alist."
 				list-size))
 	 (last-activity-alist
 	  (dashboard-ddnet--player-last-activity-parse last-activity-vector)))
-    (dashboard-ddnet--insert-alist-helper "DDNet last activity:"
-					  last-activity-alist)))
+    (dashboard-ddnet--insert-all-the-icons-icon-by-key 'ddnet-player-last-activity)
+    (insert " ")
+    (dashboard-insert-heading "DDNet last activity:")
+    (dashboard-ddnet--insert-alist-helper last-activity-alist)))
 
 (defun dashboard-ddnet--insert-player-general-informations (&optional _)
   "Insert the DDNet player general informations. LIST-SIZE will not be used
@@ -230,6 +273,8 @@ for this section."
   (let ((player-informations (dashboard-ddnet--get-json-player-informations))
 	(action-function `(lambda (&rest _)
 			    (browse-url ,(dashboard-ddnet--json-player-url-format)))))
+    (dashboard-ddnet--insert-all-the-icons-icon-by-key 'ddnet-player-general-informations)
+    (insert " ")
     (dashboard-insert-heading "DDNet player general informations:")
     (insert "\n    ")
     (widget-create 'push-button
