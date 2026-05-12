@@ -4,7 +4,7 @@
 
 [![built with nix](https://builtwithnix.org/badge.svg)](https://builtwithnix.org)
 
-dashboard-ddnet is a KISS Emacs package which contains functions that have been added to `dashboard-item-generators`. These functions are used by dashboard to insert Dashboard section containing DDNet player statistics when specified.
+dashboard-ddnet is a KISS Emacs package which contains functions that have been added to `dashboard-item-generators`. These functions are used by the dashboard to insert sections containing statistics about a specific DDNet player.
 
 ## Getting started
 
