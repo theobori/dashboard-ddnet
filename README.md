@@ -52,7 +52,7 @@ Here is a simple example of a complete configuration that includes the `dashboar
 
 ```emacs-lisp
 (use-package dashboard-ddnet
-:custom
+  :custom
   (dashboard-ddnet-player-name "brainless tee")
   (dashboard-ddnet-cache-ttl 600))
 

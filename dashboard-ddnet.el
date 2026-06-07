@@ -147,6 +147,17 @@ the cache values."
     (setq dashboard-ddnet--cache-float-time (float-time))
     dashboard-ddnet--cache-data))
 
+(defun dashboard-ddnet-reset-cache-float-time ()
+  "Set the cache float time to 0."
+  (interactive)
+  (setq dashboard-ddnet--cache-float-time 0))
+
+(defun dashboard-ddnet-force-dashboard-refresh-buffer ()
+  "Reset the cache float time then refresh the buffer."
+  (interactive)
+  (dashboard-ddnet-reset-cache-float-time)
+  (dashboard-refresh-buffer))
+
 (defun dashboard-ddnet--insert-alist-helper (alist)
   "Helper function that first insert a TITLE, then ALIST where each cons
 should have the inserted value as car and an associated url as cdr."
